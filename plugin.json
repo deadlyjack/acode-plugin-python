@@ -2,10 +2,10 @@
   "id": "acode.plugin.python",
   "name": "Python",
   "main": "dist/main.js",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "readme": "README.md",
   "icon": "icon.png",
-  "type": "paid",
+  "type": "pro",
   "files": [
     "lib/distutils.tar",
     "lib/micropip-0.1-py3-none-any.whl",
