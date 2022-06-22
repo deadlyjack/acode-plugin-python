@@ -43,6 +43,7 @@ module.exports = (env, options) => {
     mode,
     entry: {
       main: './src/main.js',
+      worker: './src/worker.js',
     },
     output: {
       path: path.resolve(__dirname, 'dist'),

@@ -7,7 +7,9 @@
   "author": "Ajit <me@ajitkumar.dev>",
   "license": "MIT",
   "dependencies": {
-    "html-tag-js": "^1.0.4"
+    "autoprefixer": "^10.4.7",
+    "html-tag-js": "^1.0.4",
+    "sass-loader": "^13.0.0"
   },
   "devDependencies": {
     "@babel/cli": "^7.17.10",

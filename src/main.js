@@ -1,15 +1,32 @@
 import tag from 'html-tag-js';
 
 class Python {
+  #worker;
+  #onInitError;
+  #onInitSuccess;
+  #onRunSuccess;
+  #onRunError;
+  #cacheFile;
   name = 'Python';
   baseUrl = '';
   pyodide = null;
   $input = null;
   $page = null;
   $runBtn = null;
-  async init($page) {
+
+  async init($page, cacheFile, cacheFileUrl) {
+    if (window.toast) {
+      window.toast('Python is loading...');
+    }
+    $page.id = 'acode-plugin-python';
     this.$page = $page;
     this.$page.settitle('Python');
+    this.#cacheFile = cacheFile;
+    const onhide = $page.onhide;
+    $page.onhide = () => {
+      this.#cacheFile.writeFile('\0');
+      onhide();
+    }
 
     let main = this.$page.get('.main');
 
@@ -21,18 +38,18 @@ class Python {
     main.style.padding = '10px';
     main.style.overflow = 'auto';
     main.style.boxSizing = 'border-box';
-
-    const $script = tag('script', {
-      src: this.baseUrl + 'lib/pyodide.js',
+    this.#worker = new Worker(this.baseUrl + 'worker.js');
+    console.log('worker line', this.#worker.line);
+    this.#worker.postMessage({
+      action: 'init',
+      baseUrl: this.baseUrl,
+      cacheFileUrl,
     });
+    this.#worker.onmessage = this.#workerOnMessage.bind(this);
 
-
-    document.head.appendChild($script);
-    await new Promise(resolve => $script.onload = resolve);
-    this.pyodide = await loadPyodide({
-      stdout: (msg) => this.print(msg),
-      stderr: (err) => this.print(err, 'error'),
-      stdin: () => this.read(),
+    await new Promise((resolve, error) => {
+      this.#onInitSuccess = resolve;
+      this.#onInitError = error;
     });
 
     this.$runBtn = tag('span', {
@@ -43,25 +60,53 @@ class Python {
       onclick: this.run.bind(this),
     });
 
+    this.$input = tag('textarea', {
+      onkeydown: this.#onkeydown.bind(this),
+      style: {
+        backgroundColor: 'transparent',
+        color: 'inherit',
+        width: '100%',
+        border: 'none',
+      },
+    });
     this.checkRunnable();
     editorManager.on('switch-file', this.checkRunnable.bind(this));
     editorManager.on('rename-file', this.checkRunnable.bind(this));
+    if (window.toast) {
+      window.toast('Python is loaded.');
+    }
   }
-  run() {
+
+  async run() {
+    await this.#cacheFile.writeFile('');
     this.$page.get('.main').innerHTML = '';
+    this.#append(this.$input);
     this.$page.classList.remove('hide');
     this.$page.show();
     setTimeout(async () => {
       const code = editorManager.editor.getValue();
-      const output = await this.pyodide.runPythonAsync(code);
-      this.print(output);
+      this.#worker.postMessage({
+        action: 'run',
+        code,
+      });
+      try {
+        const res = await new Promise((resolve, error) => {
+          this.#onRunSuccess = resolve;
+          this.#onRunError = error;
+        });
+        this.print(res, 'output');
+      } catch (error) {
+        this.print(error, 'error');
+      }
     }, 600);
   }
+
   destroy() {
     if (this.$runBtn) {
       this.$runBtn.onclick = null;
       this.$runBtn.remove();
     }
+    this.#worker.terminate();
     editorManager.off('switch-file', this.checkRunnable.bind(this));
     editorManager.off('rename-file', this.checkRunnable.bind(this));
   }
@@ -75,8 +120,8 @@ class Python {
 
     if (file.name.endsWith('.py')) {
       const $header = tag.get('header');
-      const $editIcon = $header.get('.icon.edit');
-      $header.insertBefore(this.$runBtn, $editIcon);
+      $header.get('.icon.play_arrow')?.remove();
+      $header.insertBefore(this.$runBtn, $header.lastChild);
     }
   }
 
@@ -87,26 +132,73 @@ class Python {
     });
     $output.appendChild(tag('pre', {
       textContent: res,
-      className: type
+      style: {
+        color: type === 'error' ? 'orangered' : 'inherit',
+      }
     }));
-    const $main = this.$page.get('.main');
-    if (!$main) this.$page.append(tag('div', { className: 'main' }));
-    this.$page.get('.main').append($output);
+    this.#append($output, this.$input);
   }
 
-  read() {
-    return prompt('(Python Input)>>>') || '';
+  #append(...$el) {
+    const $main = this.$page.get('.main');
+    if (!$main) this.$page.append(tag('div', { className: 'main' }));
+    this.$page.get('.main').append(...$el);
+  }
+
+  async #workerOnMessage(e) {
+    const {
+      action,
+      success,
+      error,
+      text,
+    } = e.data;
+    if (action === 'init') {
+      if (success) {
+        this.#onInitSuccess();
+      } else {
+        this.#onInitError(error);
+      }
+    }
+    if (action === 'run') {
+      if (success) {
+        this.#onRunSuccess();
+      } else {
+        this.#onRunError(error);
+      }
+    }
+    if (action === 'input') {
+      if (text) this.print(text);
+      await this.#cacheFile.writeFile('');
+      this.$input.focus();
+    }
+    if (action === 'stdout') {
+      this.print(text);
+    }
+    if (action === 'stderr') {
+      this.print(text, 'error');
+    }
+  }
+
+  #onkeydown(e) {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      const value = this.$input.value;
+      this.print(value);
+      this.#cacheFile.writeFile(value);
+      e.target.value = '';
+    }
   }
 }
+
 
 console.log('Python plugin');
 
 if (window.acode) {
   const python = new Python();
-  acode.setPluginInit('acode.plugin.python', (baseUrl, $page) => {
+  acode.setPluginInit('acode.plugin.python', (baseUrl, $page, { cacheFileUrl, cacheFile }) => {
     if (!baseUrl.endsWith('/')) baseUrl += '/';
     python.baseUrl = baseUrl;
-    python.init($page);
+    python.init($page, cacheFile, cacheFileUrl);
     console.log('Python plugin initialized');
   });
   acode.setPluginUnmount('acode.plugin.python', () => {

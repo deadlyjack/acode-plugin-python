@@ -4,7 +4,7 @@ Plugin to run python code in [Acode](https://acode.foxdebug.com) editor for andr
 
 ## Plugin is underdevelopment
 
-Using this plugin you can run python codes but doesn't output error yet, so, it might be difficult to debug your python code.
+Using this plugin you can run python codes but you cannot import other python files yet, so, this feature will be supportted in future updates.
 
 ## WARNING
 
