@@ -1,6 +1,6 @@
 {
   "name": "acode-plugin-python_runner",
-  "version": "1.0.0",
+  "version": "1.0.2",
   "description": "Acode plugin to python code",
   "main": "python_runner.js",
   "repository": "https://github.com/deadlyjack/acode-plugin-python.git",

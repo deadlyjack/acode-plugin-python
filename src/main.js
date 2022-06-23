@@ -7,6 +7,7 @@ class Python {
   #onRunSuccess;
   #onRunError;
   #cacheFile;
+  #cacheFileUrl;
   name = 'Python';
   baseUrl = '';
   pyodide = null;
@@ -15,12 +16,23 @@ class Python {
   $runBtn = null;
 
   async init($page, cacheFile, cacheFileUrl) {
-    if (window.toast) {
-      window.toast('Python is loading...');
-    }
+
+    this.#cacheFileUrl = cacheFileUrl;
+
     $page.id = 'acode-plugin-python';
+    this.$refresh = tag('span', {
+      className: 'icon refresh',
+      attr: {
+        action: 'refresh',
+      },
+      onclick: async () => {
+        await this.initWorker();
+        this.run();
+      },
+    });
     this.$page = $page;
     this.$page.settitle('Python');
+    this.$page.get('header').append(this.$refresh);
     this.#cacheFile = cacheFile;
     const onhide = $page.onhide;
     $page.onhide = () => {
@@ -38,19 +50,6 @@ class Python {
     main.style.padding = '10px';
     main.style.overflow = 'auto';
     main.style.boxSizing = 'border-box';
-    this.#worker = new Worker(this.baseUrl + 'worker.js');
-    console.log('worker line', this.#worker.line);
-    this.#worker.postMessage({
-      action: 'init',
-      baseUrl: this.baseUrl,
-      cacheFileUrl,
-    });
-    this.#worker.onmessage = this.#workerOnMessage.bind(this);
-
-    await new Promise((resolve, error) => {
-      this.#onInitSuccess = resolve;
-      this.#onInitError = error;
-    });
 
     this.$runBtn = tag('span', {
       className: 'icon play_arrow',
@@ -72,6 +71,26 @@ class Python {
     this.checkRunnable();
     editorManager.on('switch-file', this.checkRunnable.bind(this));
     editorManager.on('rename-file', this.checkRunnable.bind(this));
+
+    await this.initWorker();
+  }
+
+  async initWorker() {
+    if (this.#worker) this.#worker.terminate();
+    if (window.toast) {
+      window.toast('Python is loading...');
+    }
+    this.#worker = new Worker(this.baseUrl + 'worker.js');
+    this.#worker.postMessage({
+      action: 'init',
+      baseUrl: this.baseUrl,
+      cacheFileUrl: this.#cacheFileUrl,
+    });
+    this.#worker.onmessage = this.#workerOnMessage.bind(this);
+    await new Promise((resolve, error) => {
+      this.#onInitSuccess = resolve;
+      this.#onInitError = error;
+    });
     if (window.toast) {
       window.toast('Python is loaded.');
     }
@@ -81,8 +100,11 @@ class Python {
     await this.#cacheFile.writeFile('');
     this.$page.get('.main').innerHTML = '';
     this.#append(this.$input);
-    this.$page.classList.remove('hide');
-    this.$page.show();
+
+    if (!this.$page.isConnected) {
+      this.$page.classList.remove('hide');
+      this.$page.show();
+    }
     setTimeout(async () => {
       const code = editorManager.editor.getValue();
       this.#worker.postMessage({
@@ -106,7 +128,7 @@ class Python {
       this.$runBtn.onclick = null;
       this.$runBtn.remove();
     }
-    this.#worker.terminate();
+    if (this.#worker) this.#worker.terminate();
     editorManager.off('switch-file', this.checkRunnable.bind(this));
     editorManager.off('rename-file', this.checkRunnable.bind(this));
   }
