@@ -1,8 +1,8 @@
 {
-  "name": "acode-plugin-python_runner",
+  "name": "acode-plugin-python",
   "version": "1.0.3",
-  "description": "Acode plugin to python code",
-  "main": "python_runner.js",
+  "description": "Acode plugin to run python code",
+  "main": "dist/main.js",
   "repository": "https://github.com/deadlyjack/acode-plugin-python.git",
   "author": "Ajit <me@ajitkumar.dev>",
   "license": "MIT",
