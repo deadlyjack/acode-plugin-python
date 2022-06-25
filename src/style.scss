@@ -1,0 +1,36 @@
+#acode-plugin-python{
+
+  textarea{
+    background-color: transparent;
+    color: inherit;
+    border: none;
+    outline: none;
+    resize: none;
+    flex: 1;
+  }
+
+  .print{
+    display: flex;
+    white-space: pre;
+    overflow: auto;
+
+   &:not(:empty){
+    &::before{
+      content: '>>';
+      padding: 0 10px 0 0;
+      background: rgb(255, 255, 255);
+      background: var(--secondary-color);
+      position: sticky;
+      left: 0;
+    }
+
+    &.input::before{
+      content: '<<';
+    }
+
+    &.error{
+      color: orangered;
+    }
+   }
+  }
+}

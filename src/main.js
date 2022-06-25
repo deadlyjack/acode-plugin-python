@@ -1,3 +1,4 @@
+import style from './style.scss';
 import tag from 'html-tag-js';
 
 class Python {
@@ -8,35 +9,31 @@ class Python {
   #onRunError;
   #cacheFile;
   #cacheFileUrl;
+  #workerInitialized = false;
   name = 'Python';
   baseUrl = '';
   pyodide = null;
   $input = null;
   $page = null;
   $runBtn = null;
+  $style = null;
 
   async init($page, cacheFile, cacheFileUrl) {
 
     this.#cacheFileUrl = cacheFileUrl;
 
     $page.id = 'acode-plugin-python';
-    this.$refresh = tag('span', {
-      className: 'icon refresh',
-      attr: {
-        action: 'refresh',
-      },
-      onclick: async () => {
-        await this.initWorker();
-        this.run();
-      },
-    });
     this.$page = $page;
     this.$page.settitle('Python');
-    this.$page.get('header').append(this.$refresh);
+
     this.#cacheFile = cacheFile;
+
     const onhide = $page.onhide;
     $page.onhide = () => {
-      this.#cacheFile.writeFile('\0');
+      if (this.#workerInitialized) {
+        this.#worker.terminate();
+        this.#workerInitialized = false;
+      }
       onhide();
     }
 
@@ -59,27 +56,25 @@ class Python {
       onclick: this.run.bind(this),
     });
 
-    this.$input = tag('textarea', {
-      onkeydown: this.#onkeydown.bind(this),
-      style: {
-        backgroundColor: 'transparent',
-        color: 'inherit',
-        width: '100%',
-        border: 'none',
-      },
+    this.$style = tag('style', {
+      textContent: style,
     });
+
+    this.$input = tag('div', {
+      className: 'print input',
+      child: tag('textarea', {
+        onkeydown: this.#onkeydown.bind(this),
+      }),
+    });
+
     this.checkRunnable();
     editorManager.on('switch-file', this.checkRunnable.bind(this));
     editorManager.on('rename-file', this.checkRunnable.bind(this));
-
-    await this.initWorker();
+    document.head.append(this.$style);
   }
 
   async initWorker() {
     if (this.#worker) this.#worker.terminate();
-    if (window.toast) {
-      window.toast('Python is loading...');
-    }
     this.#worker = new Worker(this.baseUrl + 'worker.js');
     this.#worker.postMessage({
       action: 'init',
@@ -91,36 +86,43 @@ class Python {
       this.#onInitSuccess = resolve;
       this.#onInitError = error;
     });
-    if (window.toast) {
-      window.toast('Python is loaded.');
-    }
+    this.#workerInitialized = true;
   }
 
   async run() {
-    await this.#cacheFile.writeFile('');
-    this.$page.get('.main').innerHTML = '';
-    this.#append(this.$input);
-
+    const $main = this.$page.get('.main');
     if (!this.$page.isConnected) {
       this.$page.classList.remove('hide');
       this.$page.show();
     }
-    setTimeout(async () => {
-      const code = editorManager.editor.getValue();
-      this.#worker.postMessage({
-        action: 'run',
-        code,
+
+    $main.innerHTML = '';
+
+    await this.#cacheFile.writeFile('');
+    this.#append(this.$input);
+
+    this.print('Python initializing');
+    try {
+      await this.initWorker();
+    } catch (error) {
+      this.print(error, 'error');
+      return;
+    }
+
+    const code = editorManager.editor.getValue();
+    this.#worker.postMessage({
+      action: 'run',
+      code,
+    });
+    try {
+      const res = await new Promise((resolve, error) => {
+        this.#onRunSuccess = resolve;
+        this.#onRunError = error;
       });
-      try {
-        const res = await new Promise((resolve, error) => {
-          this.#onRunSuccess = resolve;
-          this.#onRunError = error;
-        });
-        this.print(res, 'output');
-      } catch (error) {
-        this.print(error, 'error');
-      }
-    }, 600);
+      this.print(res, 'output');
+    } catch (error) {
+      this.print(error, 'error');
+    }
   }
 
   destroy() {
@@ -128,9 +130,12 @@ class Python {
       this.$runBtn.onclick = null;
       this.$runBtn.remove();
     }
-    if (this.#worker) this.#worker.terminate();
+
+    if (this.#workerInitialized) this.#worker.terminate();
+
     editorManager.off('switch-file', this.checkRunnable.bind(this));
     editorManager.off('rename-file', this.checkRunnable.bind(this));
+    this.$style.remove();
   }
 
   checkRunnable() {
@@ -150,14 +155,9 @@ class Python {
   print(res, type) {
     if (!this.$page.isConnected) return;
     const $output = tag('div', {
-      className: 'python-output',
-    });
-    $output.appendChild(tag('pre', {
+      className: `print ${type || ''}`,
       textContent: res,
-      style: {
-        color: type === 'error' ? 'orangered' : 'inherit',
-      }
-    }));
+    });
     this.#append($output, this.$input);
   }
 
@@ -191,7 +191,7 @@ class Python {
     if (action === 'input') {
       if (text) this.print(text);
       await this.#cacheFile.writeFile('');
-      this.$input.focus();
+      this.$input.get('textarea').focus();
     }
     if (action === 'stdout') {
       this.print(text);
@@ -204,8 +204,8 @@ class Python {
   #onkeydown(e) {
     if (e.key === 'Enter') {
       e.preventDefault();
-      const value = this.$input.value;
-      this.print(value);
+      const value = e.target.value + '\0';
+      this.print(value, 'input');
       this.#cacheFile.writeFile(value);
       e.target.value = '';
     }
