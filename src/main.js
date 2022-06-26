@@ -10,6 +10,7 @@ class Python {
   #cacheFile;
   #cacheFileUrl;
   #workerInitialized = false;
+  #isInput = false;
   name = 'Python';
   baseUrl = '';
   pyodide = null;
@@ -17,6 +18,8 @@ class Python {
   $page = null;
   $runBtn = null;
   $style = null;
+  #codes = [];
+  #niddle = 0;
 
   async init($page, cacheFile, cacheFileUrl) {
 
@@ -110,6 +113,10 @@ class Python {
     }
 
     const code = editorManager.editor.getValue();
+    await this.runCode(code);
+  }
+
+  async runCode(code) {
     this.#worker.postMessage({
       action: 'run',
       code,
@@ -189,6 +196,7 @@ class Python {
       }
     }
     if (action === 'input') {
+      this.#isInput = true;
       if (text) this.print(text);
       await this.#cacheFile.writeFile('');
       this.$input.get('textarea').focus();
@@ -204,10 +212,36 @@ class Python {
   #onkeydown(e) {
     if (e.key === 'Enter') {
       e.preventDefault();
-      const value = e.target.value + '\0';
+      const value = e.target.value;
       this.print(value, 'input');
-      this.#cacheFile.writeFile(value);
+      if (this.#isInput) {
+        this.#isInput = false;
+        this.#cacheFile.writeFile(value + '\0');
+      } else {
+        this.#codes.push(value);
+        this.#niddle = this.#codes.length;
+        this.runCode(value);
+      }
       e.target.value = '';
+      return;
+    }
+
+    // if up arrow is pressed, show previous code
+    if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      if (this.#niddle > 0) {
+        this.#niddle -= 1;
+        e.target.value = this.#codes[this.#niddle];
+      }
+    }
+
+    // if down arrow is pressed, show next code
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      if (this.#niddle < this.#codes.length) {
+        this.#niddle += 1;
+        e.target.value = this.#codes[this.#niddle] || '';
+      }
     }
   }
 }

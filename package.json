@@ -1,6 +1,6 @@
 {
   "name": "acode-plugin-python",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "description": "Acode plugin to run python code",
   "main": "dist/main.js",
   "repository": "https://github.com/deadlyjack/acode-plugin-python.git",
@@ -26,5 +26,8 @@
   },
   "scripts": {
     "build": "webpack"
-  }
+  },
+  "browserslist": [
+    "> 0.25%, not dead"
+  ]
 }
