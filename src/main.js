@@ -145,8 +145,8 @@ class Python {
       this.$runBtn.remove();
     }
 
-    if (file.name.endsWith('.py')) {
-      const $header = tag.get('header');
+    if (file?.name.endsWith('.py')) {
+      const $header = root.get('header');
       $header.get('.icon.play_arrow')?.remove();
       $header.insertBefore(this.$runBtn, $header.lastChild);
     }

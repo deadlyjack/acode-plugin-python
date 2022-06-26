@@ -24,8 +24,11 @@
       left: 0;
     }
 
-    &.input::before{
-      content: '<<';
+    &.input{
+      color: lightgreen;
+      &::before{
+        content: '<<';
+      }
     }
 
     &.error{
