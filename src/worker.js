@@ -1,3 +1,5 @@
+let inputCount = 0;
+
 async function loadPyodideAndPackages(baseUrl = '', packages) {
   importScripts(`${baseUrl}/lib/pyodide.js`);
   self.pyodide = await loadPyodide({
@@ -46,20 +48,20 @@ __builtins__.input = input
       self.postMessage({
         action: 'run',
         success: true,
-        output,
+        output: output?.toString() ?? output ?? '',
       });
     } catch (error) {
       self.postMessage({
         action: 'run',
         success: false,
-        error,
+        error: error?.message ?? error?.toString(),
       });
     }
   },
   input(data) {
     const { line } = data;
     self.line = line;
-  },
+  }
 }
 
 self.onmessage = async function (e) {
@@ -77,14 +79,14 @@ self.line = '';
 function stdout(msg) {
   self.postMessage({
     action: 'stdout',
-    text: msg,
+    text: msg.message ?? msg.toString(),
   });
 }
 
 function stderr(msg) {
   self.postMessage({
     action: 'stderr',
-    text: msg,
+    text: msg.message ?? msg.toString(),
   });
 }
 
@@ -106,7 +108,13 @@ function read() {
   xhr.open('GET', self.cacheFileUrl, false);
   try {
     xhr.send();
-    return xhr.responseText;
+    const text = xhr.responseText;
+    if (text.endsWith(`\0${inputCount}`)) {
+      ++inputCount;
+      return text.slice(0, -(`${inputCount}`.length));
+    } else {
+      return '';
+    }
   } catch (err) {
     throw err instanceof Error ? err : new Error(err);
   }

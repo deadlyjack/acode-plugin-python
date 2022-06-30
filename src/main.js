@@ -20,6 +20,7 @@ class Python {
   $style = null;
   #codes = [];
   #niddle = 0;
+  #inputCount = 0;
 
   async init($page, cacheFile, cacheFileUrl) {
 
@@ -67,6 +68,7 @@ class Python {
       className: 'print input',
       child: tag('textarea', {
         onkeydown: this.#onkeydown.bind(this),
+        oninput: this.#oninput.bind(this),
       }),
     });
 
@@ -93,14 +95,7 @@ class Python {
   }
 
   async run() {
-    const $main = this.$page.get('.main');
-    if (!this.$page.isConnected) {
-      this.$page.classList.remove('hide');
-      this.$page.show();
-    }
-
-    $main.innerHTML = '';
-
+    this.#showPage();
     await this.#cacheFile.writeFile('');
     this.#append(this.$input);
 
@@ -114,6 +109,10 @@ class Python {
 
     const code = editorManager.editor.getValue();
     await this.runCode(code);
+  }
+
+  async terminal() {
+    this.#showPage();
   }
 
   async runCode(code) {
@@ -168,6 +167,20 @@ class Python {
     this.#append($output, this.$input);
   }
 
+  #showPage() {
+    const $main = this.$page.get('.main');
+    if (!this.$page.isConnected) {
+      this.$page.classList.remove('hide');
+      this.$page.show();
+    }
+    $main.innerHTML = '';
+  }
+
+  #clearConsole() {
+    this.$page.get('.main').innerHTML = '';
+    this.#append(this.$input);
+  }
+
   #append(...$el) {
     const $main = this.$page.get('.main');
     if (!$main) this.$page.append(tag('div', { className: 'main' }));
@@ -210,24 +223,12 @@ class Python {
   }
 
   #onkeydown(e) {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      const value = e.target.value;
-      this.print(value, 'input');
-      if (this.#isInput) {
-        this.#isInput = false;
-        this.#cacheFile.writeFile(value + '\0');
-      } else {
-        this.#codes.push(value);
-        this.#niddle = this.#codes.length;
-        this.runCode(value);
-      }
-      e.target.value = '';
-      return;
-    }
-
+    const value = e.target.value;
+    const lines = value.split('\n');
+    const canGoUp = this.#getCursorPosition() === 1;
+    const canGoDown = this.#getCursorPosition() === lines.length;
     // if up arrow is pressed, show previous code
-    if (e.key === 'ArrowUp') {
+    if (canGoUp && e.key === 'ArrowUp') {
       e.preventDefault();
       if (this.#niddle > 0) {
         this.#niddle -= 1;
@@ -236,18 +237,84 @@ class Python {
     }
 
     // if down arrow is pressed, show next code
-    if (e.key === 'ArrowDown') {
+    if (canGoDown && e.key === 'ArrowDown') {
       e.preventDefault();
       if (this.#niddle < this.#codes.length) {
         this.#niddle += 1;
         e.target.value = this.#codes[this.#niddle] || '';
       }
     }
+
+    // if ctrl + l is pressed, clear the input
+    if (e.key === 'l' && e.ctrlKey) {
+      this.#clearConsole();
+    }
+
+    if (e.key === 'Tab') {
+      e.preventDefault();
+      e.target.value += '\t';
+    }
+  }
+
+  #getCursorPosition() {
+    const $textarea = this.$input.get('textarea');
+    const {
+      selectionStart,
+      selectionEnd,
+    } = $textarea;
+
+    if (selectionStart !== selectionEnd) return;
+    const lines = $textarea.value;
+
+    // get the line number of the cursor
+    return lines.slice(0, selectionStart).split('\n').length;
+  }
+
+  #oninput(e) {
+    const $el = e.target;
+    let { value } = $el;
+    $el.style.height = `${$el.scrollHeight}px`;
+    // check if new line is added
+    if (value.endsWith('\n')) {
+      if (this.#isInput) {
+        this.#isInput = false;
+        value = value.slice(0, -1);
+        this.#cacheFile.writeFile(value + `\0${this.#inputCount++}`);
+        this.print(value, 'input');
+        this.$input.get('textarea').value = '';
+        return;
+      }
+
+      if (!this.#isIncomplete(value)) {
+        this.#codes.push(value.trim());
+        this.#niddle = this.#codes.length;
+        this.print(value, 'input');
+        this.runCode(value);
+        this.$input.get('textarea').value = '';
+      }
+    }
+  }
+
+  #isIncomplete(code) {
+    const lines = code.trim().split('\n');
+    let lastLine = lines[lines.length - 1];
+
+    // if last line ends with ':', it is incomplete
+    if (/:$/.test(lastLine)) {
+      return true;
+    }
+
+    // if last line starts with tab or soft tab, it is incomplete
+    if (/^\W+/.test(lastLine)) {
+      if (/\n\n$/.test(code)) {
+        return false;
+      }
+      return true;
+    }
+
+    return false;
   }
 }
-
-
-console.log('Python plugin');
 
 if (window.acode) {
   const python = new Python();
@@ -255,10 +322,15 @@ if (window.acode) {
     if (!baseUrl.endsWith('/')) baseUrl += '/';
     python.baseUrl = baseUrl;
     python.init($page, cacheFile, cacheFileUrl);
-    console.log('Python plugin initialized');
   });
   acode.setPluginUnmount('acode.plugin.python', () => {
     python.destroy();
-    console.log('Python plugin unmounted');
-  })
+  });
+  // future reference
+  if (acode.registerShortcut) {
+    acode.registerShortcut('Python Console', python.terminal.bind(python), 'Python');
+  }
+  if (acode.registerMenu) {
+    acode.registerMenu('Python Console', python.terminal.bind(python), 'Python');
+  }
 }

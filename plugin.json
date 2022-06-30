@@ -2,7 +2,7 @@
   "id": "acode.plugin.python",
   "name": "Python",
   "main": "dist/main.js",
-  "version": "1.0.5",
+  "version": "1.0.6",
   "readme": "README.md",
   "icon": "icon.png",
   "type": "pro",
