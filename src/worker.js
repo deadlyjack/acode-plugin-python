@@ -23,11 +23,10 @@ const actions = {
       await self.pyodide.runPython(`import sys
 def input(prompt=''):
     print(prompt)
-    return sys.stdin.readline()
+    return sys.stdin.readline().strip()
 
 __builtins__.input = input
 `);
-
       self.postMessage({
         action: 'init',
         success: true,

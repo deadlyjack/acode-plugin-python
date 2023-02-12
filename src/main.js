@@ -1,5 +1,8 @@
-import style from './style.scss';
 import tag from 'html-tag-js';
+import plugin from '../plugin.json';
+import style from './style.scss';
+
+const { id } = plugin;
 
 class Python {
   #worker;
@@ -11,9 +14,6 @@ class Python {
   #cacheFileUrl;
   #workerInitialized = false;
   #isInput = false;
-  name = 'Python';
-  baseUrl = '';
-  pyodide = null;
   $input = null;
   $page = null;
   $runBtn = null;
@@ -21,6 +21,10 @@ class Python {
   #codes = [];
   #niddle = 0;
   #inputCount = 0;
+  #workers = [];
+  name = 'Python';
+  baseUrl = '';
+  pyodide = null;
 
   async init($page, cacheFile, cacheFileUrl) {
 
@@ -96,6 +100,7 @@ class Python {
 
   async run() {
     this.#showPage();
+    this.#inputCount = 0;
     await this.#cacheFile.writeFile('');
     this.#append(this.$input);
 
@@ -318,19 +323,12 @@ class Python {
 
 if (window.acode) {
   const python = new Python();
-  acode.setPluginInit('acode.plugin.python', (baseUrl, $page, { cacheFileUrl, cacheFile }) => {
+  acode.setPluginInit(id, (baseUrl, $page, { cacheFileUrl, cacheFile }) => {
     if (!baseUrl.endsWith('/')) baseUrl += '/';
     python.baseUrl = baseUrl;
     python.init($page, cacheFile, cacheFileUrl);
   });
-  acode.setPluginUnmount('acode.plugin.python', () => {
+  acode.setPluginUnmount(id, () => {
     python.destroy();
   });
-  // future reference
-  if (acode.registerShortcut) {
-    acode.registerShortcut('Python Console', python.terminal.bind(python), 'Python');
-  }
-  if (acode.registerMenu) {
-    acode.registerMenu('Python Console', python.terminal.bind(python), 'Python');
-  }
 }
