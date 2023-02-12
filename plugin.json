@@ -5,7 +5,6 @@
   "version": "1.0.7",
   "readme": "README.md",
   "icon": "icon.png",
-  "type": "pro",
   "files": [
     "worker.js",
     "lib/distutils.tar",
