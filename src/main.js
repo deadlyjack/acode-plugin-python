@@ -2,8 +2,6 @@ import tag from 'html-tag-js';
 import plugin from '../plugin.json';
 import style from './style.scss';
 
-const { id } = plugin;
-
 class Python {
   #worker;
   #onInitError;
@@ -12,7 +10,6 @@ class Python {
   #onRunError;
   #cacheFile;
   #cacheFileUrl;
-  #workerInitialized = false;
   #isInput = false;
   $input = null;
   $page = null;
@@ -21,29 +18,31 @@ class Python {
   #codes = [];
   #niddle = 0;
   #inputCount = 0;
-  #workers = [];
+  #state = 0;
+
+  INITIALIZING = 1;
+  INITIALIZED = 2;
+  NOT_INTIALIZED = 0;
+
   name = 'Python';
   baseUrl = '';
   pyodide = null;
 
   async init($page, cacheFile, cacheFileUrl) {
+    $page.id = 'acode-plugin-python';
 
     this.#cacheFileUrl = cacheFileUrl;
-
-    $page.id = 'acode-plugin-python';
     this.$page = $page;
     this.$page.settitle('Python');
-
     this.#cacheFile = cacheFile;
 
     const onhide = $page.onhide;
     $page.onhide = () => {
-      if (this.#workerInitialized) {
-        this.#worker.terminate();
-        this.#workerInitialized = false;
-      }
+      this.#state = this.NOT_INTIALIZED;
+      this.#worker?.terminate();
+      this.initWorker();
       onhide();
-    }
+    };
 
     let main = this.$page.get('.main');
 
@@ -80,10 +79,13 @@ class Python {
     editorManager.on('switch-file', this.checkRunnable.bind(this));
     editorManager.on('rename-file', this.checkRunnable.bind(this));
     document.head.append(this.$style);
+    this.initWorker();
   }
 
   async initWorker() {
-    if (this.#worker) this.#worker.terminate();
+    if (this.#state !== this.NOT_INTIALIZED) return;
+    this.#state = this.INITIALIZING;
+    this.$page.settitle(strings['loading...']);
     this.#worker = new Worker(this.baseUrl + 'worker.js');
     this.#worker.postMessage({
       action: 'init',
@@ -91,29 +93,27 @@ class Python {
       cacheFileUrl: this.#cacheFileUrl,
     });
     this.#worker.onmessage = this.#workerOnMessage.bind(this);
-    await new Promise((resolve, error) => {
-      this.#onInitSuccess = resolve;
-      this.#onInitError = error;
-    });
-    this.#workerInitialized = true;
+
+    try {
+      await new Promise((resolve, error) => {
+        this.#onInitSuccess = resolve;
+        this.#onInitError = error;
+      });
+    } catch (error) {
+      this.print(error, 'error');
+      return;
+    }
   }
 
   async run() {
     this.#showPage();
     this.#inputCount = 0;
-    await this.#cacheFile.writeFile('');
     this.#append(this.$input);
-
-    this.print('Python initializing');
-    try {
-      await this.initWorker();
-    } catch (error) {
-      this.print(error, 'error');
-      return;
-    }
-
-    const code = editorManager.editor.getValue();
-    await this.runCode(code);
+    await this.#cacheFile.writeFile('');
+    await this.initWorker();
+    await this.runCode(
+      editorManager.editor.getValue(),
+    );
   }
 
   async terminal() {
@@ -142,8 +142,7 @@ class Python {
       this.$runBtn.remove();
     }
 
-    if (this.#workerInitialized) this.#worker.terminate();
-
+    this.#worker?.terminate();
     editorManager.off('switch-file', this.checkRunnable.bind(this));
     editorManager.off('rename-file', this.checkRunnable.bind(this));
     this.$style.remove();
@@ -199,31 +198,43 @@ class Python {
       error,
       text,
     } = e.data;
-    if (action === 'init') {
-      if (success) {
-        this.#onInitSuccess();
-      } else {
-        this.#onInitError(error);
-      }
-    }
-    if (action === 'run') {
-      if (success) {
-        this.#onRunSuccess();
-      } else {
-        this.#onRunError(error);
-      }
-    }
-    if (action === 'input') {
-      this.#isInput = true;
-      if (text) this.print(text);
-      await this.#cacheFile.writeFile('');
-      this.$input.get('textarea').focus();
-    }
-    if (action === 'stdout') {
-      this.print(text);
-    }
-    if (action === 'stderr') {
-      this.print(text, 'error');
+
+    switch (action) {
+      case 'init':
+        this.#state = this.INITIALIZED;
+        this.$page.settitle('Python');
+        if (success) {
+          this.#onInitSuccess();
+        } else {
+          this.#onInitError(error);
+        }
+        break;
+
+      case 'run':
+        if (success) {
+          this.#onRunSuccess();
+        } else {
+          this.#onRunError(error);
+        }
+        break;
+
+      case 'input':
+        this.#isInput = true;
+        if (text) this.print(text);
+        await this.#cacheFile.writeFile('');
+        this.$input.get('textarea').focus();
+        break;
+
+      case 'stdout':
+        this.print(text);
+        break;
+
+      case 'stderr':
+        this.print(text, 'error');
+        break;
+
+      default:
+        break;
     }
   }
 
@@ -323,12 +334,12 @@ class Python {
 
 if (window.acode) {
   const python = new Python();
-  acode.setPluginInit(id, (baseUrl, $page, { cacheFileUrl, cacheFile }) => {
+  acode.setPluginInit(plugin.id, (baseUrl, $page, { cacheFileUrl, cacheFile }) => {
     if (!baseUrl.endsWith('/')) baseUrl += '/';
     python.baseUrl = baseUrl;
     python.init($page, cacheFile, cacheFileUrl);
   });
-  acode.setPluginUnmount(id, () => {
+  acode.setPluginUnmount(plugin.id, () => {
     python.destroy();
   });
 }

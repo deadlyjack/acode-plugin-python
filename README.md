@@ -9,7 +9,12 @@ Using this plugin you can run python codes but you cannot import other python fi
 ### Update 1.0.7
 
 - Bugs fixes
-- Updated pyodide version
+- Updated pyodide
+
+### Update 1.1.0
+
+- Bugs fixes
+- Reduces waiting time
 
 ## WARNING
 

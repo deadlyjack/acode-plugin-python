@@ -1,33 +1,35 @@
 {
   "name": "acode-plugin-python",
-  "version": "1.0.7",
+  "version": "1.1.0",
   "description": "Acode plugin to run python code",
   "main": "dist/main.js",
   "repository": "https://github.com/deadlyjack/acode-plugin-python.git",
   "author": "Ajit <me@ajitkumar.dev>",
   "license": "MIT",
   "dependencies": {
-    "html-tag-js": "^1.1.36"
+    "html-tag-js": "^1.1.37"
   },
   "devDependencies": {
-    "@babel/cli": "^7.18.10",
-    "@babel/core": "^7.18.10",
-    "@babel/preset-env": "^7.18.10",
-    "autoprefixer": "^10.4.13",
+    "@babel/cli": "^7.21.0",
+    "@babel/core": "^7.21.3",
+    "@babel/preset-env": "^7.20.2",
+    "autoprefixer": "^10.4.14",
     "babel-loader": "^9.1.2",
     "jszip": "^3.10.1",
+    "live-server": "^1.2.2",
     "postcss": "^8.4.21",
-    "postcss-loader": "^7.0.2",
+    "postcss-loader": "^7.1.0",
     "raw-loader": "^4.0.2",
-    "sass": "^1.58.0",
-    "sass-loader": "^13.2.0",
-    "style-loader": "^3.3.1",
-    "webpack": "^5.76.0",
+    "sass": "^1.59.3",
+    "sass-loader": "^13.2.1",
+    "style-loader": "^3.3.2",
+    "webpack": "^5.76.3",
     "webpack-cli": "^5.0.1"
   },
   "scripts": {
     "build": "webpack",
-    "build-release": "webpack --mode production"
+    "build-release": "webpack --mode production",
+    "start-dev": "node .vscode/start-dev"
   },
   "browserslist": [
     "> 0.25%, not dead"
