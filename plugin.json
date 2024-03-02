@@ -2,22 +2,9 @@
   "id": "acode.plugin.python",
   "name": "Python",
   "main": "dist/main.js",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "readme": "README.md",
   "icon": "icon.png",
-  "files": [
-    "worker.js",
-    "lib/distutils.tar",
-    "lib/micropip-0.1-py3-none-any.whl",
-    "lib/packages.json",
-    "lib/packaging-21.3-py3-none-any.whl",
-    "lib/pyodide_py.tar",
-    "lib/pyodide.asm.data",
-    "lib/pyodide.asm.js",
-    "lib/pyodide.asm.wasm",
-    "lib/pyodide.js",
-    "lib/pyparsing-3.0.7-py3-none-any.whl"
-  ],
   "author": {
     "name": "Ajit Kumar",
     "email": "me@ajitkumar.dev",
